@@ -72,6 +72,7 @@ const emptyForm = {
   anzahlungBetrag: "",
   notizen: "",
   status: "Anfrage",
+  foto: "",
 };
 
 const STATUS_COLORS = {
@@ -124,6 +125,14 @@ export default function App() {
   const [toast, setToast] = useState(null);
 
   // ── LOGIN ─────────────────────────────────────────────────
+  const [dark, setDark] = useState(() => localStorage.getItem("zenith_dark") === "true");
+
+  const toggleDark = () => setDark(d => {
+    const next = !d;
+    localStorage.setItem("zenith_dark", next ? "true" : "false");
+    return next;
+  });
+
   const [isLoggedIn, setIsLoggedIn] = useState(() => {
     return sessionStorage.getItem("zenith_auth") === "true";
   });
@@ -157,20 +166,21 @@ export default function App() {
       .catch(err => { setSyncError("Verbindung zu Supabase fehlgeschlagen: " + err.message); setLoading(false); });
   }, [isLoggedIn]);
 
+  const D = dark ? darkStyles : {};
+
   if (!isLoggedIn) return (
-    <div style={styles.loginPage}>
-      <div style={styles.loginCard}>
+    <div style={{ ...styles.loginPage, ...(dark ? { background: "#1c1c1e" } : {}) }}>
+      <div style={{ ...styles.loginCard, ...(dark ? { background: "#2c2c2e", borderColor: "#3a3a3c" } : {}) }}>
         <div style={{ marginBottom: 24, textAlign: "center" }}>
-          <div style={{ fontFamily: "'Arial Black','Arial Bold',sans-serif", fontWeight: 900, fontSize: 32, letterSpacing: "0.08em", color: "#F7A800" }}>ZENITH</div>
-          <div style={{ fontSize: 11, color: "#3d5166", marginTop: 2 }}>Philipp Nolte · <strong>dk group</strong></div>
+          <img src={LOGO_SRC} alt="ZENITH" style={{ height: 36, width: "auto", filter: dark ? "none" : "none" }} />
         </div>
-        <div style={{ fontSize: 14, color: "#64748b", textAlign: "center", marginBottom: 24 }}>
+        <div style={{ fontSize: 14, color: dark ? "#8e8e93" : "#64748b", textAlign: "center", marginBottom: 24 }}>
           Bitte melde dich an um fortzufahren
         </div>
         <div style={styles.fieldGroup}>
-          <label style={styles.label}>Passwort</label>
+          <label style={{ ...styles.label, color: dark ? "#8e8e93" : undefined }}>Passwort</label>
           <input
-            style={{ ...styles.input, fontSize: 16, textAlign: "center", letterSpacing: "0.1em" }}
+            style={{ ...styles.input, ...(dark ? { background: "#3a3a3c", borderColor: "#48484a", color: "#f2f2f7" } : {}), fontSize: 16, textAlign: "center", letterSpacing: "0.1em" }}
             type="password"
             value={pwInput}
             onChange={e => { setPwInput(e.target.value); setPwError(false); }}
@@ -190,6 +200,11 @@ export default function App() {
         >
           🔓 Anmelden
         </button>
+        <div style={{ textAlign: "center", marginTop: 16 }}>
+          <button onClick={toggleDark} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer" }} title="Dark/Light Mode">
+            {dark ? "☀️" : "🌙"}
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -286,12 +301,12 @@ export default function App() {
   if (view === "form") {
     const preisGesamt = calcPreis(form);
     return (
-      <div style={styles.page}>
+      <div style={{ ...styles.page, ...(dark ? darkStyles.page : {}) }}>
         {toast && <Toast msg={toast.msg} color={toast.color} />}
-        <div style={styles.header}>
+        <div style={{ ...styles.header, ...(dark ? darkStyles.header : {}) }}>
           <div style={styles.headerLeft}>
-            <button style={styles.backBtn} onClick={() => setView("list")}>← Zurück</button>
-            <ZenithLogo compact />
+            <button style={{ ...styles.backBtn, ...(dark ? darkStyles.backBtn : {}) }} onClick={() => setView("list")}>← Zurück</button>
+            <ZenithLogo compact dark={dark} />
           </div>
           <button style={{ ...styles.btn, ...styles.btnPrimary, opacity: saving ? 0.7 : 1 }} onClick={saveForm} disabled={saving}>
             {saving ? "⏳ Speichern…" : "☁️ Speichern"}
@@ -440,6 +455,62 @@ export default function App() {
             {field("Status", "status", "select", { options: ["Anfrage","Gebucht","Abgeschlossen","Storniert"] })}
             {field("Notizen", "notizen", "textarea", { placeholder: "Besondere Wünsche, Vereinbarungen, Infos…" })}
           </Section>
+
+          <Section title="📸 Foto des Brautpaars">
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
+              {form.foto ? (
+                <div style={{ position: "relative" }}>
+                  <img
+                    src={form.foto}
+                    alt="Brautpaar"
+                    style={{ width: 160, height: 160, objectFit: "cover", borderRadius: 16, border: `3px solid ${dark ? "#3a3a3c" : "#e2e8f0"}` }}
+                  />
+                  <button
+                    onClick={() => setForm(f => ({ ...f, foto: "" }))}
+                    style={{ position: "absolute", top: -8, right: -8, background: "#ef4444", color: "#fff", border: "none", borderRadius: "50%", width: 26, height: 26, fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+                  >✕</button>
+                </div>
+              ) : (
+                <label style={{
+                  width: 160, height: 160, borderRadius: 16,
+                  border: `2px dashed ${dark ? "#48484a" : "#cbd5e1"}`,
+                  display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+                  cursor: "pointer", gap: 8, color: dark ? "#636366" : "#94a3b8",
+                }}>
+                  <span style={{ fontSize: 36 }}>📷</span>
+                  <span style={{ fontSize: 12, textAlign: "center" }}>Foto hochladen</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    style={{ display: "none" }}
+                    onChange={e => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      const reader = new FileReader();
+                      reader.onload = ev => {
+                        const img = new Image();
+                        img.onload = () => {
+                          const canvas = document.createElement("canvas");
+                          const max = 400;
+                          let w = img.width, h = img.height;
+                          if (w > h) { h = Math.round(h * max / w); w = max; }
+                          else { w = Math.round(w * max / h); h = max; }
+                          canvas.width = w; canvas.height = h;
+                          canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+                          setForm(f => ({ ...f, foto: canvas.toDataURL("image/jpeg", 0.7) }));
+                        };
+                        img.src = ev.target.result;
+                      };
+                      reader.readAsDataURL(file);
+                    }}
+                  />
+                </label>
+              )}
+              <p style={{ fontSize: 12, color: dark ? "#636366" : "#94a3b8", textAlign: "center", margin: 0 }}>
+                Wird direkt in der Datenbank gespeichert
+              </p>
+            </div>
+          </Section>
         </div>
       </div>
     );
@@ -521,12 +592,17 @@ export default function App() {
             </div>
           )}
 
-          <DetailCard title="💑 Brautpaar">
-            <DetailRow label="Partner 1" val={w.partner1} />
-            <DetailRow label="Partner 2" val={w.partner2} />
-            <DetailRow label="Adresse" val={w.adresse} />
-            <DetailRow label="Telefon" val={w.telefon} />
-            <DetailRow label="E-Mail" val={w.email} />
+          <DetailCard title="💑 Brautpaar" dark={dark}>
+            {w.foto && (
+              <div style={{ display: "flex", justifyContent: "center", marginBottom: 14 }}>
+                <img src={w.foto} alt="Brautpaar" style={{ width: 140, height: 140, objectFit: "cover", borderRadius: 14, border: `3px solid ${dark ? "#3a3a3c" : "#e2e8f0"}` }} />
+              </div>
+            )}
+            <DetailRow label="Partner 1" val={w.partner1} dark={dark} />
+            <DetailRow label="Partner 2" val={w.partner2} dark={dark} />
+            <DetailRow label="Adresse" val={w.adresse} dark={dark} />
+            <DetailRow label="Telefon" val={w.telefon} dark={dark} />
+            <DetailRow label="E-Mail" val={w.email} dark={dark} />
           </DetailCard>
 
           <DetailCard title="💒 Hochzeitstag">
@@ -564,16 +640,19 @@ export default function App() {
     .reduce((sum, w) => sum + calcPreis(w), 0);
 
   return (
-    <div style={styles.page}>
+    <div style={{ ...styles.page, ...(dark ? darkStyles.page : {}) }}>
       {toast && <Toast msg={toast.msg} color={toast.color} />}
 
-      <div style={styles.header}>
-        <ZenithLogo />
+      <div style={{ ...styles.header, ...(dark ? darkStyles.header : {}) }}>
+        <ZenithLogo dark={dark} />
         <div style={{ display: "flex", gap: 8 }}>
-          <button style={{ ...styles.btn, ...styles.btnOutline, fontSize: 13 }} onClick={reload} title="Daten neu laden">
+          <button style={{ ...styles.btn, ...(dark ? darkStyles.btnOutline : styles.btnOutline), fontSize: 16 }} onClick={toggleDark} title="Dark/Light Mode">
+            {dark ? "☀️" : "🌙"}
+          </button>
+          <button style={{ ...styles.btn, ...(dark ? darkStyles.btnOutline : styles.btnOutline), fontSize: 13 }} onClick={reload} title="Daten neu laden">
             {loading ? "⏳" : "🔄"}
           </button>
-          <button style={{ ...styles.btn, ...styles.btnOutline, fontSize: 13 }} onClick={handleLogout} title="Abmelden">
+          <button style={{ ...styles.btn, ...(dark ? darkStyles.btnOutline : styles.btnOutline), fontSize: 13 }} onClick={handleLogout} title="Abmelden">
             🔒
           </button>
           <button style={{ ...styles.btn, ...styles.btnPrimary }} onClick={openNew}>+ Neu</button>
@@ -588,25 +667,25 @@ export default function App() {
       )}
 
       <div style={{ padding: "8px 20px 0" }}>
-        <div style={styles.syncBadge}>☁️ Echtzeit-Sync · alle Geräte</div>
+        <div style={{ ...styles.syncBadge, ...(dark ? darkStyles.syncBadge : {}) }}>☁️ Echtzeit-Sync · alle Geräte</div>
       </div>
 
       <div style={styles.statsRow}>
-        <StatCard label="Gesamt" val={loading ? "…" : weddings.length} icon="💍" />
-        <StatCard label="Gebucht" val={loading ? "…" : booked} icon="✅" />
-        <StatCard label={`${new Date().getFullYear()}`} val={loading ? "…" : thisYear} icon="📅" />
+        <StatCard label="Gesamt" val={loading ? "…" : weddings.length} icon="💍" dark={dark} />
+        <StatCard label="Gebucht" val={loading ? "…" : booked} icon="✅" dark={dark} />
+        <StatCard label={`${new Date().getFullYear()}`} val={loading ? "…" : thisYear} icon="📅" dark={dark} />
         {nextWedding ? (
-          <StatCard label="Nächste Hochzeit" val={`in ${daysUntil(nextWedding.hochzeitsDatum)} Tagen`} sub={`${nextWedding.partner1} & ${nextWedding.partner2}`} icon="💒" />
+          <StatCard label="Nächste Hochzeit" val={`in ${daysUntil(nextWedding.hochzeitsDatum)} Tagen`} sub={`${nextWedding.partner1} & ${nextWedding.partner2}`} icon="💒" dark={dark} />
         ) : (
-          <StatCard label="Keine anstehend" val="—" icon="💒" />
+          <StatCard label="Keine anstehend" val="—" icon="💒" dark={dark} />
         )}
       </div>
 
       {/* Umsatz Banner */}
       {!loading && umsatzGesamt > 0 && (
-        <div style={styles.umsatzBanner}>
-          <div style={{ fontSize: 12, color: "#86efac", marginBottom: 2 }}>📊 Gesamtumsatz (alle aktiven Hochzeiten)</div>
-          <div style={{ fontSize: 28, fontWeight: 800, color: "#fff" }}>{formatEuro(umsatzGesamt)}</div>
+        <div style={{ ...styles.umsatzBanner, ...(dark ? darkStyles.umsatzBanner : {}) }}>
+          <div style={{ fontSize: 12, color: "#30d158", marginBottom: 2 }}>📊 Gesamtumsatz (alle aktiven Hochzeiten)</div>
+          <div style={{ fontSize: 28, fontWeight: 800, color: dark ? "#f2f2f7" : "#fff" }}>{formatEuro(umsatzGesamt)}</div>
           <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 2 }}>
             {weddings.filter(w => w.status !== "Storniert" && calcPreis(w) > 0).length} Hochzeiten mit Preisangabe
           </div>
@@ -640,17 +719,22 @@ export default function App() {
             const isUpcoming = days !== null && days >= 0 && w.status !== "Storniert";
             const preis = calcPreis(w);
             return (
-              <div key={w.id} style={{ ...styles.card, cursor: "pointer" }} onClick={() => openDetail(w)}>
+              <div key={w.id} style={{ ...styles.card, ...(dark ? darkStyles.card : {}), cursor: "pointer" }} onClick={() => openDetail(w)}>
                 <div style={styles.cardTop}>
-                  <div style={{ flex: 1 }}>
-                    <div style={styles.cardNames}>{w.partner1 || "Partner 1"} & {w.partner2 || "Partner 2"}</div>
-                    <div style={styles.cardDate}>{formatDate(w.hochzeitsDatum)}{w.hochzeitsUhrzeit ? ` · ${w.hochzeitsUhrzeit} Uhr` : ""}</div>
-                    {w.feierAdresse && <div style={styles.cardLocation}>📍 {w.feierAdresse}</div>}
+                  <div style={{ display: "flex", gap: 12, alignItems: "center", flex: 1 }}>
+                    {w.foto && (
+                      <img src={w.foto} alt="" style={{ width: 48, height: 48, borderRadius: 10, objectFit: "cover", flexShrink: 0, border: `2px solid ${dark ? "#3a3a3c" : "#e2e8f0"}` }} />
+                    )}
+                    <div style={{ flex: 1 }}>
+                      <div style={{ ...styles.cardNames, ...(dark ? darkStyles.cardNames : {}) }}>{w.partner1 || "Partner 1"} & {w.partner2 || "Partner 2"}</div>
+                      <div style={{ ...styles.cardDate, ...(dark ? darkStyles.cardDate : {}) }}>{formatDate(w.hochzeitsDatum)}{w.hochzeitsUhrzeit ? ` · ${w.hochzeitsUhrzeit} Uhr` : ""}</div>
+                      {w.feierAdresse && <div style={{ ...styles.cardLocation, ...(dark ? darkStyles.cardLocation : {}) }}>📍 {w.feierAdresse}</div>}
+                    </div>
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
                     <span style={{ ...styles.badge, background: STATUS_COLORS[w.status] + "22", color: STATUS_COLORS[w.status], borderColor: STATUS_COLORS[w.status] + "55" }}>{w.status}</span>
                     {isUpcoming && days !== null && <span style={{ ...styles.badge, background: "#e0f2fe", color: "#0369a1", borderColor: "#bae6fd" }}>{days === 0 ? "Heute! 🎉" : `noch ${days}d`}</span>}
-                    {preis > 0 && <span style={{ fontSize: 13, fontWeight: 700, color: "#1e293b" }}>{formatEuro(preis)}</span>}
+                    {preis > 0 && <span style={{ fontSize: 13, fontWeight: 700, color: dark ? "#f2f2f7" : "#1e293b" }}>{formatEuro(preis)}</span>}
                   </div>
                 </div>
                 {(w.gettingReady || w.fotobuch || w.fotobox || w.drohne || w.videoArt) && (
@@ -765,34 +849,30 @@ function calBtnStyle(bg) {
   };
 }
 
-function ZenithLogo({ compact = false }) {
+const LOGO_SRC = "data:image/webp;base64,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";
+
+function ZenithLogo({ compact = false, dark = false }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
-      <div style={{ display: "flex", alignItems: "baseline", gap: compact ? 6 : 8 }}>
-        <span style={{
-          fontFamily: "'Arial Black', 'Arial Bold', sans-serif",
-          fontWeight: 900,
-          fontSize: compact ? 20 : 26,
-          letterSpacing: "0.08em",
-          color: "#F7A800",
-          textTransform: "uppercase",
-          lineHeight: 1,
-        }}>ZENITH</span>
-        {!compact && (
-          <span style={{ fontSize: 11, color: "#94a3b8", fontFamily: "sans-serif", letterSpacing: "0.05em" }}>
-            Hochzeitsfotografie
-          </span>
-        )}
-      </div>
+    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+      <img
+        src={LOGO_SRC}
+        alt="ZENITH"
+        style={{
+          height: compact ? 22 : 30,
+          width: "auto",
+          objectFit: "contain",
+          filter: dark ? "brightness(0) invert(1) sepia(1) saturate(5) hue-rotate(5deg) brightness(1.2)" : "none",
+        }}
+      />
       <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-        <div style={{ height: 1, width: compact ? 20 : 26, background: "#e2e8f0" }} />
+        <div style={{ height: 1, width: compact ? 16 : 20, background: dark ? "#3a3a3c" : "#e2e8f0" }} />
         <span style={{
           fontSize: compact ? 9 : 10,
-          color: "#3d5166",
+          color: dark ? "#636366" : "#3d5166",
           fontFamily: "sans-serif",
           letterSpacing: "0.04em",
         }}>
-          Philipp Nolte · <strong style={{ color: "#3d5166" }}>dk group</strong>
+          Philipp Nolte · <strong style={{ color: dark ? "#8e8e93" : "#3d5166" }}>dk group</strong>
         </span>
       </div>
     </div>
@@ -802,30 +882,56 @@ function ZenithLogo({ compact = false }) {
 function Toast({ msg, color }) {
   return <div style={{ position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", background: color, color: "#fff", padding: "10px 20px", borderRadius: 30, fontWeight: 600, fontSize: 13, zIndex: 999, boxShadow: "0 4px 20px #0003", whiteSpace: "nowrap", maxWidth: "90vw", textAlign: "center" }}>{msg}</div>;
 }
-function Section({ title, children }) {
-  return <div style={styles.section}><div style={styles.sectionTitle}>{title}</div>{children}</div>;
+function Section({ title, children, dark = false }) {
+  return <div style={{ ...styles.section, ...(dark ? darkStyles.section : {}) }}><div style={{ ...styles.sectionTitle, ...(dark ? darkStyles.sectionTitle : {}) }}>{title}</div>{children}</div>;
 }
-function DetailCard({ title, children }) {
-  return <div style={styles.card}><div style={{ fontWeight: 700, marginBottom: 12, fontSize: 15 }}>{title}</div>{children}</div>;
+function DetailCard({ title, children, dark = false }) {
+  return <div style={{ ...styles.card, ...(dark ? darkStyles.card : {}) }}><div style={{ fontWeight: 700, marginBottom: 12, fontSize: 15, color: dark ? '#f2f2f7' : '#1e293b' }}>{title}</div>{children}</div>;
 }
-function DetailRow({ label, val }) {
+function DetailRow({ label, val, dark = false }) {
   if (!val) return null;
   return (
     <div style={{ display: "flex", gap: 12, marginBottom: 8, fontSize: 14 }}>
-      <span style={{ color: "#94a3b8", minWidth: 120 }}>{label}</span>
-      <span style={{ color: "#1e293b", fontWeight: 500 }}>{val}</span>
+      <span style={{ color: dark ? "#636366" : "#94a3b8", minWidth: 120 }}>{label}</span>
+      <span style={{ color: dark ? "#f2f2f7" : "#1e293b", fontWeight: 500 }}>{val}</span>
     </div>
   );
 }
-function StatCard({ label, val, sub, icon }) {
+function StatCard({ label, val, sub, icon, dark = false }) {
   return (
-    <div style={styles.statCard}>
+    <div style={{ ...styles.statCard, ...(dark ? darkStyles.statCard : {}) }}>
       <div style={{ fontSize: 22, marginBottom: 4 }}>{icon}</div>
-      <div style={{ fontSize: 20, fontWeight: 800, color: "#1e293b" }}>{val}</div>
-      <div style={{ fontSize: 12, color: "#64748b", fontWeight: 500 }}>{label}</div>
-      {sub && <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 2 }}>{sub}</div>}
+      <div style={{ fontSize: 20, fontWeight: 800, color: dark ? "#f2f2f7" : "#1e293b" }}>{val}</div>
+      <div style={{ fontSize: 12, color: dark ? "#8e8e93" : "#64748b", fontWeight: 500 }}>{label}</div>
+      {sub && <div style={{ fontSize: 11, color: dark ? "#636366" : "#94a3b8", marginTop: 2 }}>{sub}</div>}
     </div>
   );
+}
+
+
+const darkStyles = {
+  page: { background: "#1c1c1e" },
+  header: { background: "#2c2c2e", borderBottomColor: "#3a3a3c" },
+  card: { background: "#2c2c2e", borderColor: "#3a3a3c" },
+  section: { background: "#2c2c2e", borderColor: "#3a3a3c" },
+  statCard: { background: "#2c2c2e", borderColor: "#3a3a3c" },
+  input: { background: "#3a3a3c", borderColor: "#48484a", color: "#f2f2f7" },
+  label: { color: "#8e8e93" },
+  sectionTitle: { color: "#f2f2f7", borderBottomColor: "#3a3a3c" },
+  cardNames: { color: "#f2f2f7" },
+  cardDate: { color: "#8e8e93" },
+  cardLocation: { color: "#636366" },
+  checkLabel: { color: "#f2f2f7" },
+  backBtn: { color: "#8e8e93" },
+  btnOutline: { background: "#3a3a3c", color: "#f2f2f7", border: "1px solid #48484a" },
+  syncBadge: { background: "rgba(48,209,88,0.12)", borderColor: "rgba(48,209,88,0.3)", color: "#30d158" },
+  umsatzBanner: { background: "#2c2c2e", borderColor: "#3a3a3c" },
+  toolbar: {},
+  empty: { color: "#636366" },
+};
+
+function ds(dark, key, styles) {
+  return dark ? { ...styles[key], ...(darkStyles[key] || {}) } : styles[key];
 }
 
 const styles = {
