@@ -145,13 +145,24 @@ export default function App() {
     sessionStorage.removeItem("zenith_auth");
     setIsLoggedIn(false);
     setPwInput("");
+    setWeddings([]);
   };
+
+  // Load from Supabase – nur wenn eingeloggt
+  useEffect(() => {
+    if (!isLoggedIn) { setLoading(false); return; }
+    setLoading(true);
+    dbGetAll()
+      .then(data => { setWeddings(data); setLoading(false); })
+      .catch(err => { setSyncError("Verbindung zu Supabase fehlgeschlagen: " + err.message); setLoading(false); });
+  }, [isLoggedIn]);
 
   if (!isLoggedIn) return (
     <div style={styles.loginPage}>
       <div style={styles.loginCard}>
         <div style={{ marginBottom: 24, textAlign: "center" }}>
-          <ZenithLogo />
+          <div style={{ fontFamily: "'Arial Black','Arial Bold',sans-serif", fontWeight: 900, fontSize: 32, letterSpacing: "0.08em", color: "#F7A800" }}>ZENITH</div>
+          <div style={{ fontSize: 11, color: "#3d5166", marginTop: 2 }}>Philipp Nolte · <strong>dk group</strong></div>
         </div>
         <div style={{ fontSize: 14, color: "#64748b", textAlign: "center", marginBottom: 24 }}>
           Bitte melde dich an um fortzufahren
@@ -182,13 +193,6 @@ export default function App() {
       </div>
     </div>
   );
-
-  // Load from Supabase on mount
-  useEffect(() => {
-    dbGetAll()
-      .then(data => { setWeddings(data); setLoading(false); })
-      .catch(err => { setSyncError("Verbindung zu Supabase fehlgeschlagen: " + err.message); setLoading(false); });
-  }, []);
 
   const showToast = (msg, color = "#10b981") => {
     setToast({ msg, color });
