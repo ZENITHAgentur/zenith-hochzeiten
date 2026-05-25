@@ -105,6 +105,7 @@ function calcPreis(form) {
   else if (form.individualPreis) total += parseFloat(form.individualPreis);
   if (form.videoArt === "zusammenfassung" || form.videoArt === "trauung") total += 990;
   else if (form.videoArt === "nurVideo" && form.videoStunden) total += parseFloat(form.videoStunden) * 350;
+  if (form.fotobox) total += 250;
   return total;
 }
 
@@ -303,6 +304,7 @@ export default function App() {
                 <div style={{ fontSize: 26, fontWeight: 800, color: "#14532d" }}>{formatEuro(calcPreis(form))}</div>
                 {form.paket && !form.individualPreis && <div style={styles.preisLine}>📷 Foto {form.paket}: {formatEuro(PAKETE.find(p=>p.label===form.paket)?.preis)}</div>}
                 {form.individualPreis && <div style={styles.preisLine}>📷 Individueller Preis: {formatEuro(parseFloat(form.individualPreis))}</div>}
+                {form.fotobox && <div style={styles.preisLine}>📦 Fotobox: {formatEuro(250)}</div>}
                 {(form.videoArt === "zusammenfassung" || form.videoArt === "trauung") && <div style={styles.preisLine}>🎬 Video-Add-on: {formatEuro(990)}</div>}
                 {form.videoArt === "nurVideo" && form.videoStunden && <div style={styles.preisLine}>🎬 Nur Video ({form.videoStunden} Std.): {formatEuro(parseFloat(form.videoStunden)*350)}</div>}
               </div>
@@ -431,6 +433,7 @@ export default function App() {
                   <div style={{ fontSize: 28, fontWeight: 800, color: "#fff", marginBottom: 10 }}>{formatEuro(preisGesamt)}</div>
                   {w.paket && !w.individualPreis && <div style={{ fontSize: 13, color: "#cbd5e1" }}>📷 Foto {w.paket}: {formatEuro(PAKETE.find(p=>p.label===w.paket)?.preis)}</div>}
                   {w.individualPreis && <div style={{ fontSize: 13, color: "#cbd5e1" }}>📷 Individueller Preis: {formatEuro(parseFloat(w.individualPreis))}</div>}
+                  {w.fotobox && <div style={{ fontSize: 13, color: "#cbd5e1" }}>📦 Fotobox: {formatEuro(250)}</div>}
                   {(w.videoArt === "zusammenfassung" || w.videoArt === "trauung") && <div style={{ fontSize: 13, color: "#cbd5e1" }}>🎬 Video-Add-on: {formatEuro(990)}</div>}
                   {w.videoArt === "nurVideo" && w.videoStunden && <div style={{ fontSize: 13, color: "#cbd5e1" }}>🎬 Nur Video ({w.videoStunden} Std.): {formatEuro(parseFloat(w.videoStunden)*350)}</div>}
                 </>
@@ -490,6 +493,9 @@ export default function App() {
   const booked = weddings.filter(w => w.status === "Gebucht").length;
   const thisYear = weddings.filter(w => w.hochzeitsDatum?.startsWith(new Date().getFullYear().toString())).length;
   const nextWedding = upcoming[0];
+  const umsatzGesamt = weddings
+    .filter(w => w.status !== "Storniert")
+    .reduce((sum, w) => sum + calcPreis(w), 0);
 
   return (
     <div style={styles.page}>
@@ -526,6 +532,17 @@ export default function App() {
           <StatCard label="Keine anstehend" val="—" icon="💒" />
         )}
       </div>
+
+      {/* Umsatz Banner */}
+      {!loading && umsatzGesamt > 0 && (
+        <div style={styles.umsatzBanner}>
+          <div style={{ fontSize: 12, color: "#86efac", marginBottom: 2 }}>📊 Gesamtumsatz (alle aktiven Hochzeiten)</div>
+          <div style={{ fontSize: 28, fontWeight: 800, color: "#fff" }}>{formatEuro(umsatzGesamt)}</div>
+          <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 2 }}>
+            {weddings.filter(w => w.status !== "Storniert" && calcPreis(w) > 0).length} Hochzeiten mit Preisangabe
+          </div>
+        </div>
+      )}
 
       <div style={styles.toolbar}>
         <input style={{ ...styles.input, flex: 1, marginBottom: 0 }} placeholder="🔍 Name oder Datum suchen…"
@@ -754,6 +771,7 @@ const styles = {
   btnOutline: { background: "#f1f5f9", color: "#1e293b", border: "1px solid #e2e8f0" },
   syncBadge: { display: "inline-block", fontSize: 11, color: "#10b981", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 20, padding: "3px 10px", fontWeight: 600 },
   errorBanner: { background: "#ef4444", color: "#fff", padding: "10px 20px", fontSize: 13, fontWeight: 600 },
+  umsatzBanner: { margin: "12px 20px 0", background: "linear-gradient(135deg,#1e293b,#334155)", borderRadius: 14, padding: "16px 20px", border: "1px solid #334155" },
   statsRow: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, padding: "12px 20px 0" },
   statCard: { background: "#fff", borderRadius: 14, padding: "14px 16px", border: "1px solid #e2e8f0", textAlign: "center" },
   toolbar: { display: "flex", gap: 10, padding: "12px 20px", alignItems: "center" },
