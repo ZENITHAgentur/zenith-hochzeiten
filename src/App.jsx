@@ -64,8 +64,12 @@ const emptyForm = {
   drohne: false,
   gaeste: "",
   paket: "",
+  individualPreis: "",
   videoArt: "",
   videoStunden: "",
+  angebotGewuenscht: false,
+  anzahlungVereinbart: false,
+  anzahlungBetrag: "",
   notizen: "",
   status: "Anfrage",
 };
@@ -98,6 +102,7 @@ function calcPreis(form) {
   let total = 0;
   const paket = PAKETE.find(p => p.label === form.paket);
   if (paket) total += paket.preis;
+  else if (form.individualPreis) total += parseFloat(form.individualPreis);
   if (form.videoArt === "zusammenfassung" || form.videoArt === "trauung") total += 990;
   else if (form.videoArt === "nurVideo" && form.videoStunden) total += parseFloat(form.videoStunden) * 350;
   return total;
@@ -267,21 +272,60 @@ export default function App() {
               {PAKETE.map(p => (
                 <button key={p.label}
                   style={{ ...styles.paketBtn, ...(form.paket === p.label ? styles.paketBtnActive : {}) }}
-                  onClick={() => setForm(f => ({ ...f, paket: f.paket === p.label ? "" : p.label }))}>
+                  onClick={() => setForm(f => ({ ...f, paket: f.paket === p.label ? "" : p.label, individualPreis: "" }))}>
                   <span style={{ fontWeight: 700, fontSize: 15 }}>{p.label}</span>
                   <span style={{ fontSize: 13, color: form.paket === p.label ? "#fff" : "#64748b" }}>{formatEuro(p.preis)}</span>
                 </button>
               ))}
             </div>
-            {preisGesamt > 0 && (
+
+            {/* Individueller Preis */}
+            <div style={styles.fieldGroup}>
+              <label style={styles.label}>Individueller Preis (z.B. Freundschaftspreis)</label>
+              <div style={{ position: "relative" }}>
+                <input
+                  style={{ ...styles.input, paddingLeft: 28 }}
+                  type="number"
+                  value={form.individualPreis || ""}
+                  onChange={e => setForm(f => ({ ...f, individualPreis: e.target.value, paket: "" }))}
+                  placeholder="z.B. 1200"
+                />
+                <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "#94a3b8", fontSize: 14 }}>€</span>
+              </div>
+              {form.paket && form.individualPreis && (
+                <div style={{ fontSize: 11, color: "#f59e0b", marginTop: 4 }}>⚠️ Paket wird ignoriert wenn individueller Preis gesetzt ist</div>
+              )}
+            </div>
+
+            {calcPreis(form) > 0 && (
               <div style={styles.preisBox}>
                 <div style={{ fontSize: 12, color: "#166534", marginBottom: 2 }}>Gesamtpreis (kalkuliert)</div>
-                <div style={{ fontSize: 26, fontWeight: 800, color: "#14532d" }}>{formatEuro(preisGesamt)}</div>
-                {form.paket && <div style={styles.preisLine}>📷 Foto {form.paket}: {formatEuro(PAKETE.find(p=>p.label===form.paket)?.preis)}</div>}
+                <div style={{ fontSize: 26, fontWeight: 800, color: "#14532d" }}>{formatEuro(calcPreis(form))}</div>
+                {form.paket && !form.individualPreis && <div style={styles.preisLine}>📷 Foto {form.paket}: {formatEuro(PAKETE.find(p=>p.label===form.paket)?.preis)}</div>}
+                {form.individualPreis && <div style={styles.preisLine}>📷 Individueller Preis: {formatEuro(parseFloat(form.individualPreis))}</div>}
                 {(form.videoArt === "zusammenfassung" || form.videoArt === "trauung") && <div style={styles.preisLine}>🎬 Video-Add-on: {formatEuro(990)}</div>}
                 {form.videoArt === "nurVideo" && form.videoStunden && <div style={styles.preisLine}>🎬 Nur Video ({form.videoStunden} Std.): {formatEuro(parseFloat(form.videoStunden)*350)}</div>}
               </div>
             )}
+
+            {/* Angebot & Anzahlung */}
+            <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 10 }}>
+              <div style={styles.checkRow}>
+                <input type="checkbox" id="angebotGewuenscht" checked={!!form.angebotGewuenscht}
+                  onChange={e => setForm(f => ({ ...f, angebotGewuenscht: e.target.checked }))} style={styles.checkbox} />
+                <label htmlFor="angebotGewuenscht" style={styles.checkLabel}>📄 Schriftliches Angebot gewünscht</label>
+              </div>
+              <div style={styles.checkRow}>
+                <input type="checkbox" id="anzahlungVereinbart" checked={!!form.anzahlungVereinbart}
+                  onChange={e => setForm(f => ({ ...f, anzahlungVereinbart: e.target.checked }))} style={styles.checkbox} />
+                <label htmlFor="anzahlungVereinbart" style={styles.checkLabel}>💶 Anzahlung vereinbart</label>
+              </div>
+              {form.anzahlungVereinbart && (
+                <div style={{ paddingLeft: 24 }}>
+                  {field("Anzahlungsbetrag", "anzahlungBetrag", "number", { placeholder: "z.B. 500" })}
+                </div>
+              )}
+            </div>
           </Section>
 
           <Section title="📦 Leistungen / Extras">
@@ -379,13 +423,32 @@ export default function App() {
             </div>
           )}
 
-          {preisGesamt > 0 && (
+          {(preisGesamt > 0 || w.angebotGewuenscht || w.anzahlungVereinbart) && (
             <div style={{ ...styles.card, background: "linear-gradient(135deg,#1e293b,#334155)", borderColor: "#1e293b" }}>
-              <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 4 }}>Gesamtpreis</div>
-              <div style={{ fontSize: 28, fontWeight: 800, color: "#fff", marginBottom: 10 }}>{formatEuro(preisGesamt)}</div>
-              {w.paket && <div style={{ fontSize: 13, color: "#cbd5e1" }}>📷 Foto {w.paket}: {formatEuro(PAKETE.find(p=>p.label===w.paket)?.preis)}</div>}
-              {(w.videoArt === "zusammenfassung" || w.videoArt === "trauung") && <div style={{ fontSize: 13, color: "#cbd5e1" }}>🎬 Video-Add-on: {formatEuro(990)}</div>}
-              {w.videoArt === "nurVideo" && w.videoStunden && <div style={{ fontSize: 13, color: "#cbd5e1" }}>🎬 Nur Video ({w.videoStunden} Std.): {formatEuro(parseFloat(w.videoStunden)*350)}</div>}
+              {preisGesamt > 0 && (
+                <>
+                  <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 4 }}>Gesamtpreis</div>
+                  <div style={{ fontSize: 28, fontWeight: 800, color: "#fff", marginBottom: 10 }}>{formatEuro(preisGesamt)}</div>
+                  {w.paket && !w.individualPreis && <div style={{ fontSize: 13, color: "#cbd5e1" }}>📷 Foto {w.paket}: {formatEuro(PAKETE.find(p=>p.label===w.paket)?.preis)}</div>}
+                  {w.individualPreis && <div style={{ fontSize: 13, color: "#cbd5e1" }}>📷 Individueller Preis: {formatEuro(parseFloat(w.individualPreis))}</div>}
+                  {(w.videoArt === "zusammenfassung" || w.videoArt === "trauung") && <div style={{ fontSize: 13, color: "#cbd5e1" }}>🎬 Video-Add-on: {formatEuro(990)}</div>}
+                  {w.videoArt === "nurVideo" && w.videoStunden && <div style={{ fontSize: 13, color: "#cbd5e1" }}>🎬 Nur Video ({w.videoStunden} Std.): {formatEuro(parseFloat(w.videoStunden)*350)}</div>}
+                </>
+              )}
+              {(w.angebotGewuenscht || w.anzahlungVereinbart) && (
+                <div style={{ marginTop: preisGesamt > 0 ? 12 : 0, paddingTop: preisGesamt > 0 ? 12 : 0, borderTop: preisGesamt > 0 ? "1px solid #475569" : "none", display: "flex", flexDirection: "column", gap: 6 }}>
+                  {w.angebotGewuenscht && (
+                    <div style={{ fontSize: 13, color: "#fde68a", display: "flex", alignItems: "center", gap: 6 }}>
+                      📄 Schriftliches Angebot gewünscht
+                    </div>
+                  )}
+                  {w.anzahlungVereinbart && (
+                    <div style={{ fontSize: 13, color: "#86efac", display: "flex", alignItems: "center", gap: 6 }}>
+                      💶 Anzahlung vereinbart{w.anzahlungBetrag ? `: ${formatEuro(parseFloat(w.anzahlungBetrag))}` : ""}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
