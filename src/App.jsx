@@ -644,19 +644,15 @@ export default function App() {
       {toast && <Toast msg={toast.msg} color={toast.color} />}
 
       <div style={{ ...styles.header, ...(dark ? darkStyles.header : {}) }}>
-        <ZenithLogo dark={dark} />
-        <div style={{ display: "flex", gap: 8 }}>
-          <button style={{ ...styles.btn, ...(dark ? darkStyles.btnOutline : styles.btnOutline), fontSize: 16 }} onClick={toggleDark} title="Dark/Light Mode">
-            {dark ? "☀️" : "🌙"}
-          </button>
-          <button style={{ ...styles.btn, ...(dark ? darkStyles.btnOutline : styles.btnOutline), fontSize: 13 }} onClick={reload} title="Daten neu laden">
-            {loading ? "⏳" : "🔄"}
-          </button>
-          <button style={{ ...styles.btn, ...(dark ? darkStyles.btnOutline : styles.btnOutline), fontSize: 13 }} onClick={handleLogout} title="Abmelden">
-            🔒
-          </button>
-          <button style={{ ...styles.btn, ...styles.btnPrimary }} onClick={openNew}>+ Neu</button>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+          <ZenithLogo dark={dark} />
+          <div style={{ display: "flex", gap: 6 }}>
+            <button style={{ ...styles.btnIcon, ...(dark ? darkStyles.btnOutline : styles.btnOutline) }} onClick={toggleDark} title="Dark/Light Mode">{dark ? "☀️" : "🌙"}</button>
+            <button style={{ ...styles.btnIcon, ...(dark ? darkStyles.btnOutline : styles.btnOutline) }} onClick={reload} title="Aktualisieren">{loading ? "⏳" : "🔄"}</button>
+            <button style={{ ...styles.btnIcon, ...(dark ? darkStyles.btnOutline : styles.btnOutline) }} onClick={handleLogout} title="Abmelden">🔒</button>
+          </div>
         </div>
+        <button style={{ ...styles.btn, ...styles.btnPrimary, width: "100%", fontSize: 15 }} onClick={openNew}>+ Neue Hochzeit anlegen</button>
       </div>
 
       {syncError && (
@@ -938,12 +934,13 @@ const styles = {
   page: { fontFamily: "'Georgia','Times New Roman',serif", background: "#f8fafc", minHeight: "100vh", padding: "0 0 40px", maxWidth: 680, margin: "0 auto" },
   loginPage: { fontFamily: "'Georgia','Times New Roman',serif", background: "#f8fafc", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" },
   loginCard: { background: "#fff", borderRadius: 20, padding: "32px 28px", border: "1px solid #e2e8f0", width: "100%", maxWidth: 360, boxShadow: "0 8px 40px #0001" },
-  header: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "20px 20px 16px", background: "#fff", borderBottom: "1px solid #e2e8f0", position: "sticky", top: 0, zIndex: 10 },
+  header: { display: "flex", flexDirection: "column", padding: "14px 20px 12px", background: "#fff", borderBottom: "1px solid #e2e8f0", position: "sticky", top: 0, zIndex: 10 },
   headerLeft: { display: "flex", alignItems: "center", gap: 12 },
   logo: { margin: 0, fontSize: 20, fontWeight: 800, color: "#1e293b", letterSpacing: "-0.5px" },
   pageTitle: { margin: 0, fontSize: 18, fontWeight: 700, color: "#1e293b" },
   backBtn: { background: "none", border: "none", cursor: "pointer", color: "#64748b", fontSize: 14, padding: "4px 8px", borderRadius: 6, fontFamily: "inherit" },
   btn: { padding: "9px 16px", borderRadius: 10, border: "none", fontFamily: "inherit", fontWeight: 600, fontSize: 14, cursor: "pointer" },
+  btnIcon: { width: 34, height: 34, borderRadius: 10, border: "none", fontFamily: "inherit", fontSize: 15, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", background: "#f1f5f9", color: "#1e293b" },
   btnPrimary: { background: "#1e293b", color: "#fff" },
   btnOutline: { background: "#f1f5f9", color: "#1e293b", border: "1px solid #e2e8f0" },
   syncBadge: { display: "inline-block", fontSize: 11, color: "#10b981", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 20, padding: "3px 10px", fontWeight: 600 },
