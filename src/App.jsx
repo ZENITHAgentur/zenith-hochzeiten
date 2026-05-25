@@ -647,12 +647,12 @@ export default function App() {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
           <ZenithLogo dark={dark} />
           <div style={{ display: "flex", gap: 6 }}>
-            <button style={{ ...styles.btnIcon, ...(dark ? darkStyles.btnOutline : styles.btnOutline) }} onClick={toggleDark} title="Dark/Light Mode">{dark ? "☀️" : "🌙"}</button>
-            <button style={{ ...styles.btnIcon, ...(dark ? darkStyles.btnOutline : styles.btnOutline) }} onClick={reload} title="Aktualisieren">{loading ? "⏳" : "🔄"}</button>
-            <button style={{ ...styles.btnIcon, ...(dark ? darkStyles.btnOutline : styles.btnOutline) }} onClick={handleLogout} title="Abmelden">🔒</button>
+            <button style={{ width: 32, height: 32, borderRadius: 9, border: "none", fontSize: 14, cursor: "pointer", background: dark ? "#3a3a3c" : "#f1f5f9", display: "flex", alignItems: "center", justifyContent: "center" }} onClick={toggleDark} title="Dark/Light Mode">{dark ? "☀️" : "🌙"}</button>
+            <button style={{ width: 32, height: 32, borderRadius: 9, border: "none", fontSize: 14, cursor: "pointer", background: dark ? "#3a3a3c" : "#f1f5f9", display: "flex", alignItems: "center", justifyContent: "center" }} onClick={reload} title="Aktualisieren">{loading ? "⏳" : "🔄"}</button>
+            <button style={{ width: 32, height: 32, borderRadius: 9, border: "none", fontSize: 14, cursor: "pointer", background: dark ? "#3a3a3c" : "#f1f5f9", display: "flex", alignItems: "center", justifyContent: "center" }} onClick={handleLogout} title="Abmelden">🔒</button>
           </div>
         </div>
-        <button style={{ ...styles.btn, ...styles.btnPrimary, width: "100%", fontSize: 15 }} onClick={openNew}>+ Neue Hochzeit anlegen</button>
+        <button style={{ ...styles.btn, background: "#F7A800", color: "#1c1c1e", width: "100%", fontSize: 15, fontWeight: 700, borderRadius: 12 }} onClick={openNew}>+ Neue Hochzeit anlegen</button>
       </div>
 
       {syncError && (
@@ -931,8 +931,8 @@ function ds(dark, key, styles) {
 }
 
 const styles = {
-  page: { fontFamily: "'Georgia','Times New Roman',serif", background: "#f8fafc", minHeight: "100vh", padding: "0 0 40px", maxWidth: 680, margin: "0 auto" },
-  loginPage: { fontFamily: "'Georgia','Times New Roman',serif", background: "#f8fafc", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" },
+  page: { fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', sans-serif", background: "#f8fafc", minHeight: "100vh", padding: "0 0 40px", maxWidth: 680, margin: "0 auto" },
+  loginPage: { fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', sans-serif", background: "#f8fafc", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" },
   loginCard: { background: "#fff", borderRadius: 20, padding: "32px 28px", border: "1px solid #e2e8f0", width: "100%", maxWidth: 360, boxShadow: "0 8px 40px #0001" },
   header: { display: "flex", flexDirection: "column", padding: "14px 20px 12px", background: "#fff", borderBottom: "1px solid #e2e8f0", position: "sticky", top: 0, zIndex: 10 },
   headerLeft: { display: "flex", alignItems: "center", gap: 12 },
@@ -952,7 +952,7 @@ const styles = {
   cardList: { padding: "0 20px", display: "flex", flexDirection: "column", gap: 10 },
   card: { background: "#fff", borderRadius: 14, padding: "16px", border: "1px solid #e2e8f0" },
   cardTop: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 },
-  cardNames: { fontWeight: 700, fontSize: 16, color: "#1e293b", fontFamily: "Georgia, serif" },
+  cardNames: { fontWeight: 700, fontSize: 16, color: "#1e293b" },
   cardDate: { fontSize: 13, color: "#64748b", marginTop: 2 },
   cardLocation: { fontSize: 12, color: "#94a3b8", marginTop: 4 },
   badge: { fontSize: 11, fontWeight: 600, padding: "3px 9px", borderRadius: 20, border: "1px solid", display: "inline-block" },
@@ -963,13 +963,13 @@ const styles = {
   section: { background: "#fff", borderRadius: 14, padding: "16px", border: "1px solid #e2e8f0" },
   sectionTitle: { fontWeight: 700, fontSize: 14, marginBottom: 14, color: "#1e293b", borderBottom: "1px solid #f1f5f9", paddingBottom: 8 },
   fieldGroup: { marginBottom: 12 },
-  label: { display: "block", fontSize: 12, fontWeight: 600, color: "#64748b", marginBottom: 6, fontFamily: "inherit" },
-  input: { width: "100%", boxSizing: "border-box", padding: "9px 12px", borderRadius: 9, border: "1px solid #e2e8f0", fontSize: 14, fontFamily: "inherit", color: "#1e293b", background: "#fafafa", outline: "none", marginBottom: 0 },
+  label: { display: "block", fontSize: 12, fontWeight: 600, color: "#64748b", marginBottom: 6 },
+  input: { width: "100%", boxSizing: "border-box", padding: "9px 12px", borderRadius: 9, border: "1px solid #e2e8f0", fontSize: 14, color: "#1e293b", background: "#fafafa", outline: "none", marginBottom: 0 },
   row2: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 },
   checkGrid: { display: "flex", gap: 20, flexWrap: "wrap" },
   checkRow: { display: "flex", alignItems: "center", gap: 8, marginBottom: 4 },
   checkbox: { width: 16, height: 16, cursor: "pointer", accentColor: "#1e293b" },
-  checkLabel: { fontSize: 14, color: "#1e293b", fontFamily: "inherit" },
+  checkLabel: { fontSize: 14, color: "#1e293b" },
   paketGrid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 },
   paketBtn: { display: "flex", flexDirection: "column", alignItems: "center", padding: "12px 8px", borderRadius: 12, border: "2px solid #e2e8f0", background: "#f8fafc", cursor: "pointer", gap: 4, fontFamily: "inherit" },
   paketBtnActive: { background: "#1e293b", borderColor: "#1e293b", color: "#fff" },
