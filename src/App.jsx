@@ -620,11 +620,13 @@ export default function App() {
             {leistungen.length === 0 && !videoLabel && <span style={{ color: "#94a3b8" }}>Keine Zusatzleistungen</span>}
           </DetailCard>
 
-          {w.notizen && <DetailCard title="📝 Notizen"><p style={{ margin: 0, whiteSpace: "pre-wrap", lineHeight: 1.6 }}>{w.notizen}</p></DetailCard>}
+          {w.notizen && <DetailCard title="📝 Notizen" dark={dark}><p style={{ margin: 0, whiteSpace: "pre-wrap", lineHeight: 1.6, color: dark ? "#f2f2f7" : "#1e293b" }}>{w.notizen}</p></DetailCard>}
 
-          <DetailCard title="📋 Erstgespräch">
-            <DetailRow label="Datum" val={formatDate(w.erstgespraechDatum)} />
-            <DetailRow label="Ort" val={w.erstgespraechAdresse} />
+          <MailButtons w={w} dark={dark} />
+
+          <DetailCard title="📋 Erstgespräch" dark={dark}>
+            <DetailRow label="Datum" val={formatDate(w.erstgespraechDatum)} dark={dark} />
+            <DetailRow label="Ort" val={w.erstgespraechAdresse} dark={dark} />
           </DetailCard>
         </div>
       </div>
@@ -749,6 +751,132 @@ export default function App() {
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+function MailButtons({ w, dark }) {
+  const preis = calcPreis(w);
+
+  const buildMailto = (type) => {
+    const isAnzahlung = type === "anzahlung";
+    const anzahlung = w.anzahlungBetrag ? parseFloat(w.anzahlungBetrag) : null;
+
+    const subject = isAnzahlung
+      ? `Anzahlungsrechnung – Hochzeit ${w.partner1} & ${w.partner2} am ${formatDate(w.hochzeitsDatum)}`
+      : `Angebotsanfrage – Hochzeit ${w.partner1} & ${w.partner2} am ${formatDate(w.hochzeitsDatum)}`;
+
+    const lines = isAnzahlung ? [
+      `Hallo,`,
+      ``,
+      `bitte eine Anzahlungsrechnung für folgende Hochzeit erstellen:`,
+      ``,
+      `── BRAUTPAAR ──────────────────────`,
+      `Partner 1:     ${w.partner1 || "–"}`,
+      `Partner 2:     ${w.partner2 || "–"}`,
+      `Adresse:       ${w.adresse || "–"}`,
+      `Telefon:       ${w.telefon || "–"}`,
+      `E-Mail:        ${w.email || "–"}`,
+      ``,
+      `── HOCHZEIT ───────────────────────`,
+      `Datum:         ${formatDate(w.hochzeitsDatum)}${w.hochzeitsUhrzeit ? ` · ${w.hochzeitsUhrzeit} Uhr` : ""}`,
+      `Paket:         ${w.paket || (w.individualPreis ? `Individuell: ${formatEuro(parseFloat(w.individualPreis))}` : "–")}`,
+      ``,
+      `── RECHNUNG ───────────────────────`,
+      `Gesamtpreis:   ${preis > 0 ? formatEuro(preis) : "–"}`,
+      `Anzahlung:     ${anzahlung ? formatEuro(anzahlung) : "Betrag vereinbart – bitte erfragen"}`,
+      `Restbetrag:    ${anzahlung && preis ? formatEuro(preis - anzahlung) : "–"}`,
+      ``,
+      w.notizen ? `── NOTIZEN ────────────────────────\n${w.notizen}\n` : null,
+      `Bitte Anzahlungsrechnung zeitnah erstellen und an den Kunden senden.`,
+      ``,
+      `Viele Grüße`,
+      `Philipp Nolte`,
+    ] : [
+      `Hallo,`,
+      ``,
+      `bitte ein Angebot für folgende Hochzeit erstellen:`,
+      ``,
+      `── BRAUTPAAR ──────────────────────`,
+      `Partner 1:     ${w.partner1 || "–"}`,
+      `Partner 2:     ${w.partner2 || "–"}`,
+      `Adresse:       ${w.adresse || "–"}`,
+      `Telefon:       ${w.telefon || "–"}`,
+      `E-Mail:        ${w.email || "–"}`,
+      ``,
+      `── HOCHZEIT ───────────────────────`,
+      `Datum:         ${formatDate(w.hochzeitsDatum)}${w.hochzeitsUhrzeit ? ` · ${w.hochzeitsUhrzeit} Uhr` : ""}`,
+      `Trauung:       ${w.trauungArt || "–"}`,
+      `Ort Trauung:   ${w.trauungAdresse || "–"}`,
+      `Ort Feier:     ${w.feierAdresse || "–"}`,
+      `Gäste:         ${w.gaeste ? `ca. ${w.gaeste}` : "–"}`,
+      ``,
+      `── LEISTUNGEN ─────────────────────`,
+      `Paket:         ${w.paket || (w.individualPreis ? `Individuell: ${formatEuro(parseFloat(w.individualPreis))}` : "–")}`,
+      w.gettingReady ? `Getting Ready: Ja` : null,
+      w.fotobuch ? `Fotobuch:      Ja` : null,
+      w.fotobox ? `Fotobox:       Ja${w.fotoboxDetails ? ` (${w.fotoboxDetails})` : ""}` : null,
+      w.drohne ? `Drohne:        Ja` : null,
+      w.videoArt ? `Video:         ${w.videoArt === "zusammenfassung" ? "Zusammenfassung des ganzen Tages" : w.videoArt === "trauung" ? "Gesamte Trauung (Langvideo)" : `Nur Video (${w.videoStunden} Std.)`}` : null,
+      ``,
+      `── PREIS ──────────────────────────`,
+      `Gesamtpreis:   ${preis > 0 ? formatEuro(preis) : "Noch nicht festgelegt"}`,
+      ``,
+      w.notizen ? `── NOTIZEN ────────────────────────\n${w.notizen}\n` : null,
+      `Bitte Angebot zeitnah erstellen und an den Kunden senden.`,
+      ``,
+      `Viele Grüße`,
+      `Philipp Nolte`,
+    ];
+
+    const body = lines.filter(l => l !== null).join("\n");
+    return `mailto:buchhaltung@zenith-agentur.de?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  };
+
+  return (
+    <div style={{ ...styles.card, ...(dark ? darkStyles.card : {}) }}>
+      <div style={{ fontWeight: 700, marginBottom: 4, fontSize: 15, color: dark ? "#f2f2f7" : "#1e293b" }}>📧 Buchhaltung benachrichtigen</div>
+      <p style={{ fontSize: 12, color: dark ? "#636366" : "#94a3b8", marginBottom: 12, lineHeight: 1.5 }}>
+        Öffnet deine Mail-App mit allen Infos vorausgefüllt – du tippst nur noch auf „Senden".
+      </p>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+
+        {/* Angebot */}
+        <a href={buildMailto("angebot")} style={{
+          display: "flex", alignItems: "center", gap: 12, padding: "12px 14px",
+          borderRadius: 12, textDecoration: "none",
+          background: dark ? "#052e16" : "#f0fdf4",
+          border: `1px solid ${dark ? "#166534" : "#86efac"}`,
+        }}>
+          <span style={{ fontSize: 24 }}>📄</span>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 14, color: dark ? "#4ade80" : "#166534" }}>Angebot anfordern</div>
+            <div style={{ fontSize: 11, color: dark ? "#16a34a" : "#4ade80", marginTop: 1 }}>buchhaltung@zenith-agentur.de</div>
+          </div>
+        </a>
+
+        {/* Anzahlung */}
+        {w.anzahlungVereinbart ? (
+          <a href={buildMailto("anzahlung")} style={{
+            display: "flex", alignItems: "center", gap: 12, padding: "12px 14px",
+            borderRadius: 12, textDecoration: "none",
+            background: dark ? "#0c1a2e" : "#eff6ff",
+            border: `1px solid ${dark ? "#1d4ed8" : "#93c5fd"}`,
+          }}>
+            <span style={{ fontSize: 24 }}>💶</span>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 14, color: dark ? "#60a5fa" : "#1d4ed8" }}>Anzahlungsrechnung anfordern</div>
+              <div style={{ fontSize: 11, color: dark ? "#3b82f6" : "#60a5fa", marginTop: 1 }}>
+                {w.anzahlungBetrag ? `${formatEuro(parseFloat(w.anzahlungBetrag))} vereinbart · ` : ""}buchhaltung@zenith-agentur.de
+              </div>
+            </div>
+          </a>
+        ) : (
+          <div style={{ fontSize: 12, color: dark ? "#48484a" : "#cbd5e1", padding: "8px 4px", display: "flex", alignItems: "center", gap: 8 }}>
+            <span>💶</span> Keine Anzahlung vereinbart – im Formular aktivierbar
+          </div>
+        )}
+      </div>
     </div>
   );
 }
