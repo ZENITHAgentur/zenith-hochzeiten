@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <clipPath id="r">
+      <rect x="256" y="0" width="256" height="512"/>
+    </clipPath>
+  </defs>
+
+  <!-- Background -->
+  <rect width="512" height="512" rx="110" fill="#1A1A1A"/>
+
+  <!-- Right ring (back layer) -->
+  <circle cx="310" cy="272" r="92" fill="none" stroke="#C9A227" stroke-width="28"/>
+
+  <!-- Left ring (front layer on left side) -->
+  <circle cx="202" cy="272" r="92" fill="none" stroke="#C9A227" stroke-width="28"/>
+
+  <!-- Right ring redrawn clipped to right half – appears in front on right side -->
+  <circle cx="310" cy="272" r="92" fill="none" stroke="#C9A227" stroke-width="28" clip-path="url(#r)"/>
+</svg>
