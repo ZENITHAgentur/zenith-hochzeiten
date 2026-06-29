@@ -21,7 +21,7 @@ export function Dashboard({ onOpenBooking }: { onOpenBooking: (b: BookingWithRef
   useEffect(() => {
     supabase
       .from('bookings')
-      .select('*, boxes(*), customers(*)')
+      .select('*, boxes(*)')
       .neq('status', 'storniert')
       .order('start_date', { ascending: true })
       .then(({ data }) => {
@@ -65,7 +65,7 @@ export function Dashboard({ onOpenBooking }: { onOpenBooking: (b: BookingWithRef
         <KpiCard
           label={`Umsatz ${thisYear}`}
           value={formatEuro(totalRevenue)}
-          sub="Netto, bestätigt + Option"
+          sub="Brutto, bestätigt + Option"
         />
         <KpiCard
           label="Nächste Einsätze"
@@ -93,7 +93,6 @@ export function Dashboard({ onOpenBooking }: { onOpenBooking: (b: BookingWithRef
                 <tr className="border-b border-hairline bg-paper">
                   <th className="text-left px-4 py-3 text-xs font-medium text-muted uppercase tracking-wide">Termin</th>
                   <th className="text-left px-4 py-3 text-xs font-medium text-muted uppercase tracking-wide">Anlass</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-muted uppercase tracking-wide hidden md:table-cell">Box</th>
                   <th className="text-left px-4 py-3 text-xs font-medium text-muted uppercase tracking-wide hidden lg:table-cell">Ort</th>
                   <th className="text-left px-4 py-3 text-xs font-medium text-muted uppercase tracking-wide">Status</th>
                   <th className="text-right px-4 py-3 text-xs font-medium text-muted uppercase tracking-wide hidden md:table-cell">In</th>
@@ -113,11 +112,10 @@ export function Dashboard({ onOpenBooking }: { onOpenBooking: (b: BookingWithRef
                       </td>
                       <td className="px-4 py-3 text-ink max-w-[180px] truncate">
                         {b.title}
-                        {b.customers && (
-                          <span className="text-muted ml-1 text-xs">· {b.customers.company}</span>
+                        {b.billing_company && (
+                          <span className="text-muted ml-1 text-xs">· {b.billing_company}</span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-muted hidden md:table-cell">{b.boxes?.name ?? '—'}</td>
                       <td className="px-4 py-3 text-muted hidden lg:table-cell max-w-[160px] truncate">{b.location ?? '—'}</td>
                       <td className="px-4 py-3"><StatusBadge status={b.status} /></td>
                       <td className="px-4 py-3 tabular-nums text-right text-muted hidden md:table-cell">
@@ -156,9 +154,8 @@ export function Dashboard({ onOpenBooking }: { onOpenBooking: (b: BookingWithRef
                     onClick={() => onOpenBooking(b)}
                     className="hover:bg-paper cursor-pointer transition-colors"
                   >
-                    <td className="px-4 py-3 tabular-nums text-ink whitespace-nowrap">{formatDate(b.start_date)}</td>
+                    <td className="px-4 py-3 tabular-nums text-ink whitespace-nowrap">{formatDate(b.end_date)}</td>
                     <td className="px-4 py-3 text-ink">{b.title}</td>
-                    <td className="px-4 py-3 text-muted hidden md:table-cell">{b.boxes?.name}</td>
                     <td className="px-4 py-3 tabular-nums text-ink font-medium text-right">{formatEuro(b.price_net)}</td>
                     <td className="px-4 py-3"><InvoiceBadge status={b.invoice_status} /></td>
                   </tr>

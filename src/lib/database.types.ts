@@ -70,10 +70,14 @@ export type Database = {
           box_id: string
           customer_id: string | null
           title: string
+          billing_company: string | null
+          billing_address: string | null
           location: string | null
           start_date: string
           end_date: string
           logistics: 'aufbau' | 'abholung'
+          with_printer: boolean
+          setup_cost: number | null
           media_packages: number
           price_net: number | null
           status: 'option' | 'bestaetigt' | 'storniert'
@@ -87,10 +91,14 @@ export type Database = {
           box_id: string
           customer_id?: string | null
           title: string
+          billing_company?: string | null
+          billing_address?: string | null
           location?: string | null
           start_date: string
           end_date: string
           logistics: 'aufbau' | 'abholung'
+          with_printer?: boolean
+          setup_cost?: number | null
           media_packages?: number
           price_net?: number | null
           status?: 'option' | 'bestaetigt' | 'storniert'
@@ -102,10 +110,14 @@ export type Database = {
           box_id?: string
           customer_id?: string | null
           title?: string
+          billing_company?: string | null
+          billing_address?: string | null
           location?: string | null
           start_date?: string
           end_date?: string
           logistics?: 'aufbau' | 'abholung'
+          with_printer?: boolean
+          setup_cost?: number | null
           media_packages?: number
           price_net?: number | null
           status?: 'option' | 'bestaetigt' | 'storniert'
@@ -116,12 +128,6 @@ export type Database = {
             foreignKeyName: 'bookings_box_id_fkey'
             columns: ['box_id']
             referencedRelation: 'boxes'
-            referencedColumns: ['id']
-          },
-          {
-            foreignKeyName: 'bookings_customer_id_fkey'
-            columns: ['customer_id']
-            referencedRelation: 'customers'
             referencedColumns: ['id']
           },
         ]
@@ -167,5 +173,4 @@ export type Profile = Database['public']['Tables']['profiles']['Row']
 
 export type BookingWithRefs = Booking & {
   boxes: Box | null
-  customers: Customer | null
 }

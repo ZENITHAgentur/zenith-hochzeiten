@@ -2,7 +2,6 @@ import { useState, useCallback } from 'react'
 import { Dashboard } from '@/pages/Dashboard'
 import { Bookings } from '@/pages/Bookings'
 import { Availability } from '@/pages/Availability'
-import { Customers } from '@/pages/Customers'
 import { Layout } from '@/components/layout/Layout'
 import type { Page } from '@/components/layout/Sidebar'
 import { Toast } from '@/components/ui/Toast'
@@ -36,9 +35,6 @@ export default function App() {
         )}
         {page === 'availability' && (
           <Availability onToast={showToast} />
-        )}
-        {page === 'customers' && (
-          <Customers onToast={showToast} />
         )}
       </Layout>
 

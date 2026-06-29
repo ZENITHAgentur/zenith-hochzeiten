@@ -1,43 +1,49 @@
 import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
-import type { Box, Customer, BookingWithRefs } from '@/lib/database.types'
+import type { Box, BookingWithRefs } from '@/lib/database.types'
 import {
-  formatDate, formatDateRange, formatEuro, isoToday,
-  STATUS_LABELS, INVOICE_LABELS, LOGISTICS_LABELS, cn,
+  formatDate, formatEuro, isoToday,
+  STATUS_LABELS, INVOICE_LABELS, cn,
 } from '@/lib/utils'
 import { Button } from '@/components/ui/Button'
-import { Badge, StatusBadge, InvoiceBadge } from '@/components/ui/Badge'
+import { StatusBadge, InvoiceBadge } from '@/components/ui/Badge'
 import { Modal } from '@/components/ui/Modal'
 import { Drawer, DrawerSection, DrawerField } from '@/components/ui/Drawer'
 import { Input, Select, Textarea } from '@/components/ui/Input'
 import type { ToastData } from '@/components/ui/Toast'
 
+const BASE_PRICE_MIT_DRUCKER = 300
+const BASE_PRICE_OHNE_DRUCKER = 200
+
 type BookingForm = {
   title: string
-  customer_id: string
-  box_id: string
+  billing_company: string
+  billing_address: string
   location: string
-  start_date: string
-  end_date: string
-  logistics: 'aufbau' | 'abholung'
-  media_packages: string
-  price_net: string
+  aufbaudatum: string
+  event_date: string
+  with_printer: boolean
+  setup_cost: string
   status: 'option' | 'bestaetigt' | 'storniert'
   notes: string
 }
 
 const emptyForm: BookingForm = {
   title: '',
-  customer_id: '',
-  box_id: '',
+  billing_company: '',
+  billing_address: '',
   location: '',
-  start_date: isoToday(),
-  end_date: isoToday(),
-  logistics: 'aufbau',
-  media_packages: '1',
-  price_net: '',
+  aufbaudatum: '',
+  event_date: isoToday(),
+  with_printer: true,
+  setup_cost: '',
   status: 'option',
   notes: '',
+}
+
+function calcTotal(form: BookingForm): number {
+  const base = form.with_printer ? BASE_PRICE_MIT_DRUCKER : BASE_PRICE_OHNE_DRUCKER
+  return base + (parseFloat(form.setup_cost) || 0)
 }
 
 export function Bookings({
@@ -50,8 +56,7 @@ export function Bookings({
   onToast: (t: ToastData) => void
 }) {
   const [bookings, setBookings] = useState<BookingWithRefs[]>([])
-  const [boxes, setBoxes] = useState<Box[]>([])
-  const [customers, setCustomers] = useState<Customer[]>([])
+  const [defaultBox, setDefaultBox] = useState<Box | null>(null)
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState('all')
@@ -67,19 +72,18 @@ export function Bookings({
   const load = useCallback(async () => {
     const { data } = await supabase
       .from('bookings')
-      .select('*, boxes(*), customers(*)')
-      .order('start_date', { ascending: false })
+      .select('*, boxes(*)')
+      .order('end_date', { ascending: false })
     setBookings((data ?? []) as BookingWithRefs[])
     setLoading(false)
   }, [])
 
   useEffect(() => {
     load()
-    supabase.from('boxes').select('*').eq('active', true).then(({ data }) => setBoxes(data ?? []))
-    supabase.from('customers').select('*').order('company').then(({ data }) => setCustomers(data ?? []))
+    supabase.from('boxes').select('*').eq('active', true).limit(1).single()
+      .then(({ data }) => setDefaultBox(data))
   }, [load])
 
-  // Open booking passed from dashboard
   useEffect(() => {
     if (openBooking) {
       setDrawer(openBooking)
@@ -90,32 +94,32 @@ export function Bookings({
 
   const filtered = bookings.filter(b => {
     const q = search.toLowerCase()
-    const matchSearch = !q || b.title.toLowerCase().includes(q)
-      || b.customers?.company?.toLowerCase().includes(q)
+    const matchSearch = !q
+      || b.title.toLowerCase().includes(q)
+      || b.billing_company?.toLowerCase().includes(q)
       || b.location?.toLowerCase().includes(q)
-      || b.boxes?.name?.toLowerCase().includes(q)
     const matchStatus = filterStatus === 'all' || b.status === filterStatus
     return matchSearch && matchStatus
   })
 
   const openNew = () => {
-    setForm({ ...emptyForm, start_date: isoToday(), end_date: isoToday() })
+    setForm({ ...emptyForm, event_date: isoToday() })
     setFormErrors({})
     setEditMode(false)
     setModalOpen(true)
   }
 
   const openEdit = (b: BookingWithRefs) => {
+    const hasAufbau = b.start_date !== b.end_date
     setForm({
       title: b.title,
-      customer_id: b.customer_id ?? '',
-      box_id: b.box_id,
+      billing_company: b.billing_company ?? '',
+      billing_address: b.billing_address ?? '',
       location: b.location ?? '',
-      start_date: b.start_date,
-      end_date: b.end_date,
-      logistics: b.logistics,
-      media_packages: String(b.media_packages),
-      price_net: b.price_net != null ? String(b.price_net) : '',
+      aufbaudatum: hasAufbau ? b.start_date : '',
+      event_date: b.end_date,
+      with_printer: b.with_printer ?? true,
+      setup_cost: b.setup_cost != null ? String(b.setup_cost) : '',
       status: b.status,
       notes: b.notes ?? '',
     })
@@ -127,28 +131,35 @@ export function Bookings({
   const validate = (): boolean => {
     const errors: Partial<Record<keyof BookingForm, string>> = {}
     if (!form.title.trim()) errors.title = 'Pflichtfeld'
-    if (!form.box_id) errors.box_id = 'Bitte eine Box wählen'
-    if (!form.start_date) errors.start_date = 'Pflichtfeld'
-    if (!form.end_date) errors.end_date = 'Pflichtfeld'
-    if (form.end_date < form.start_date) errors.end_date = 'Enddatum vor Startdatum'
+    if (!form.event_date) errors.event_date = 'Pflichtfeld'
+    if (form.aufbaudatum && form.aufbaudatum > form.event_date)
+      errors.aufbaudatum = 'Aufbaudatum muss vor dem Veranstaltungstag liegen'
     setFormErrors(errors)
     return Object.keys(errors).length === 0
   }
 
   const saveBooking = async () => {
     if (!validate()) return
+    if (!defaultBox) {
+      onToast({ message: 'Keine aktive Fotobox gefunden', type: 'error' })
+      return
+    }
     setSaving(true)
     try {
+      const hasAufbau = !!form.aufbaudatum && form.aufbaudatum !== form.event_date
       const payload = {
         title: form.title.trim(),
-        customer_id: form.customer_id || null,
-        box_id: form.box_id,
+        box_id: defaultBox.id,
+        billing_company: form.billing_company || null,
+        billing_address: form.billing_address || null,
         location: form.location || null,
-        start_date: form.start_date,
-        end_date: form.end_date,
-        logistics: form.logistics,
-        media_packages: parseInt(form.media_packages) || 1,
-        price_net: form.price_net ? parseFloat(form.price_net) : null,
+        start_date: hasAufbau ? form.aufbaudatum : form.event_date,
+        end_date: form.event_date,
+        logistics: hasAufbau ? ('aufbau' as const) : ('abholung' as const),
+        with_printer: form.with_printer,
+        setup_cost: parseFloat(form.setup_cost) || null,
+        media_packages: 1,
+        price_net: calcTotal(form),
         status: form.status,
         notes: form.notes || null,
       }
@@ -207,7 +218,6 @@ export function Bookings({
     setSendLoading(false)
   }
 
-  // Reload drawer data from fresh bookings after load
   useEffect(() => {
     if (drawer) {
       const fresh = bookings.find(b => b.id === drawer.id)
@@ -215,18 +225,20 @@ export function Bookings({
     }
   }, [bookings]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const f = (key: keyof BookingForm, value: string) =>
+  const f = (key: keyof BookingForm, value: string | boolean) =>
     setForm(prev => ({ ...prev, [key]: value }))
 
+  const drawerHasAufbau = drawer ? drawer.start_date !== drawer.end_date : false
+
   return (
-    <div className="p-6 space-y-4 max-w-6xl">
+    <div className="p-6 space-y-4 max-w-5xl">
       {/* Toolbar */}
       <div className="flex flex-col sm:flex-row gap-3">
         <input
           type="search"
           value={search}
           onChange={e => setSearch(e.target.value)}
-          placeholder="Suchen nach Anlass, Kunde, Ort…"
+          placeholder="Suchen nach Anlass, Auftraggeber, Ort…"
           className="flex-1 rounded-lg border border-hairline bg-white px-3 py-2 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-gold"
         />
         <select
@@ -267,13 +279,12 @@ export function Bookings({
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-hairline bg-paper">
-                  <th className="text-left px-4 py-3 text-xs font-medium text-muted uppercase tracking-wide">Datum</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-muted uppercase tracking-wide">Veranstaltungstag</th>
                   <th className="text-left px-4 py-3 text-xs font-medium text-muted uppercase tracking-wide">Anlass</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-muted uppercase tracking-wide hidden md:table-cell">Box</th>
                   <th className="text-left px-4 py-3 text-xs font-medium text-muted uppercase tracking-wide hidden lg:table-cell">Ort</th>
                   <th className="text-left px-4 py-3 text-xs font-medium text-muted uppercase tracking-wide">Status</th>
                   <th className="text-left px-4 py-3 text-xs font-medium text-muted uppercase tracking-wide hidden md:table-cell">Rechnung</th>
-                  <th className="text-right px-4 py-3 text-xs font-medium text-muted uppercase tracking-wide hidden lg:table-cell">Preis</th>
+                  <th className="text-right px-4 py-3 text-xs font-medium text-muted uppercase tracking-wide hidden lg:table-cell">Gesamt</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-hairline">
@@ -283,16 +294,19 @@ export function Bookings({
                     onClick={() => { setDrawer(b); setEditMode(false) }}
                     className="hover:bg-paper cursor-pointer transition-colors"
                   >
-                    <td className="px-4 py-3 tabular-nums text-ink whitespace-nowrap">{formatDateRange(b.start_date, b.end_date)}</td>
+                    <td className="px-4 py-3 tabular-nums text-ink whitespace-nowrap">{formatDate(b.end_date)}</td>
                     <td className="px-4 py-3 text-ink max-w-[200px]">
                       <div className="truncate font-medium">{b.title}</div>
-                      {b.customers && <div className="text-xs text-muted truncate">{b.customers.company}</div>}
+                      {b.billing_company && (
+                        <div className="text-xs text-muted truncate">{b.billing_company}</div>
+                      )}
                     </td>
-                    <td className="px-4 py-3 text-muted hidden md:table-cell">{b.boxes?.name ?? '—'}</td>
                     <td className="px-4 py-3 text-muted hidden lg:table-cell max-w-[140px] truncate">{b.location ?? '—'}</td>
                     <td className="px-4 py-3"><StatusBadge status={b.status} /></td>
                     <td className="px-4 py-3 hidden md:table-cell"><InvoiceBadge status={b.invoice_status} /></td>
-                    <td className="px-4 py-3 tabular-nums text-right hidden lg:table-cell font-medium">{formatEuro(b.price_net)}</td>
+                    <td className="px-4 py-3 tabular-nums text-right hidden lg:table-cell font-medium">
+                      {formatEuro(b.price_net)}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -331,10 +345,7 @@ export function Bookings({
                 >
                   An Buchhaltung senden
                 </Button>
-                <Button
-                  variant="secondary"
-                  onClick={() => { openEdit(drawer); }}
-                >
+                <Button variant="secondary" onClick={() => openEdit(drawer)}>
                   Bearbeiten
                 </Button>
                 <Button
@@ -363,25 +374,41 @@ export function Bookings({
               <InvoiceBadge status={drawer.invoice_status} />
             </div>
 
-            <DrawerSection title="Termin & Box">
-              <DrawerField label="Datum" value={formatDateRange(drawer.start_date, drawer.end_date)} />
-              <DrawerField label="Box" value={drawer.boxes?.name} />
-              <DrawerField label="Ort" value={drawer.location} />
-              <DrawerField label="Logistik" value={LOGISTICS_LABELS[drawer.logistics] ?? drawer.logistics} />
+            <DrawerSection title="Termin">
+              {drawerHasAufbau && (
+                <DrawerField label="Aufbaudatum" value={formatDate(drawer.start_date)} />
+              )}
+              <DrawerField label="Veranstaltungstag" value={formatDate(drawer.end_date)} />
+              {drawer.location && <DrawerField label="Ort" value={drawer.location} />}
             </DrawerSection>
 
-            {drawer.customers && (
-              <DrawerSection title="Kunde">
-                <DrawerField label="Firma" value={drawer.customers.company} />
-                {drawer.customers.contact && <DrawerField label="Kontakt" value={drawer.customers.contact} />}
-                {drawer.customers.email && <DrawerField label="E-Mail" value={drawer.customers.email} />}
-                {drawer.customers.phone && <DrawerField label="Telefon" value={drawer.customers.phone} />}
+            {(drawer.billing_company || drawer.billing_address) && (
+              <DrawerSection title="Auftraggeber">
+                {drawer.billing_company && <DrawerField label="Firma" value={drawer.billing_company} />}
+                {drawer.billing_address && <DrawerField label="Adresse" value={drawer.billing_address} />}
               </DrawerSection>
             )}
 
             <DrawerSection title="Leistung">
-              <DrawerField label="Mediapakete" value={`${drawer.media_packages}× (à 400 Fotos)`} />
-              <DrawerField label="Preis (Netto)" value={formatEuro(drawer.price_net)} />
+              <DrawerField
+                label="Paket"
+                value={drawer.with_printer
+                  ? 'Mit Drucker · inkl. 400 Fotos + Mediapaket'
+                  : 'Ohne Drucker · inkl. 400 Fotos + Mediapaket'}
+              />
+              <DrawerField
+                label="Basispreis"
+                value={formatEuro(drawer.with_printer ? BASE_PRICE_MIT_DRUCKER : BASE_PRICE_OHNE_DRUCKER)}
+              />
+              {drawer.setup_cost != null && drawer.setup_cost > 0 && (
+                <DrawerField label="Aufbaukosten" value={formatEuro(drawer.setup_cost)} />
+              )}
+              <DrawerField
+                label="Gesamt (brutto)"
+                value={
+                  <span className="font-semibold text-ink">{formatEuro(drawer.price_net)}</span>
+                }
+              />
             </DrawerSection>
 
             {drawer.notes && (
@@ -414,6 +441,7 @@ export function Bookings({
         }
       >
         <div className="space-y-4">
+          {/* Anlass */}
           <Input
             label="Anlass *"
             value={form.title}
@@ -421,87 +449,117 @@ export function Bookings({
             placeholder="z. B. Hochzeit Müller"
             error={formErrors.title}
           />
-          <div className="grid grid-cols-2 gap-4">
-            <Select
-              label="Box *"
-              value={form.box_id}
-              onChange={e => f('box_id', e.target.value)}
-              options={[
-                { value: '', label: '— Box wählen —' },
-                ...boxes.map(b => ({ value: b.id, label: b.name })),
-              ]}
-              error={formErrors.box_id}
-            />
-            <Select
-              label="Kunde"
-              value={form.customer_id}
-              onChange={e => f('customer_id', e.target.value)}
-              options={[
-                { value: '', label: '— Kein Kunde —' },
-                ...customers.map(c => ({ value: c.id, label: c.company })),
-              ]}
-            />
-          </div>
+
+          {/* Auftraggeber */}
+          <Input
+            label="Firma / Rechnungsempfänger"
+            value={form.billing_company}
+            onChange={e => f('billing_company', e.target.value)}
+            placeholder="z. B. Muster GmbH oder Max Mustermann"
+          />
+          <Textarea
+            label="Rechnungsadresse"
+            value={form.billing_address}
+            onChange={e => f('billing_address', e.target.value)}
+            placeholder={'Musterstraße 1\n12345 Musterstadt'}
+            rows={3}
+          />
+
+          {/* Ort */}
           <Input
             label="Veranstaltungsort"
             value={form.location}
             onChange={e => f('location', e.target.value)}
             placeholder="z. B. Schloss Ehreshoven, Engelskirchen"
           />
+
+          {/* Datum */}
           <div className="grid grid-cols-2 gap-4">
             <Input
-              label="Von *"
+              label="Aufbaudatum (optional)"
               type="date"
-              value={form.start_date}
-              onChange={e => {
-                f('start_date', e.target.value)
-                if (e.target.value > form.end_date) f('end_date', e.target.value)
-              }}
-              error={formErrors.start_date}
+              value={form.aufbaudatum}
+              onChange={e => f('aufbaudatum', e.target.value)}
+              error={formErrors.aufbaudatum}
             />
             <Input
-              label="Bis *"
+              label="Veranstaltungstag *"
               type="date"
-              value={form.end_date}
-              onChange={e => f('end_date', e.target.value)}
-              error={formErrors.end_date}
+              value={form.event_date}
+              onChange={e => f('event_date', e.target.value)}
+              error={formErrors.event_date}
             />
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <Select
-              label="Logistik"
-              value={form.logistics}
-              onChange={e => f('logistics', e.target.value as 'aufbau' | 'abholung')}
-              options={[
-                { value: 'aufbau', label: 'Auf-/Abbau (wir)' },
-                { value: 'abholung', label: 'Abholung (Kunde)' },
-              ]}
-            />
+
+          {/* Preis */}
+          <div className="rounded-lg border border-hairline p-4 space-y-3 bg-paper">
+            <p className="text-xs font-medium text-muted uppercase tracking-wide">Leistung & Preis</p>
+
+            {/* Mit/Ohne Drucker */}
+            <div className="grid grid-cols-2 gap-3">
+              <label className={cn(
+                'flex flex-col gap-1 rounded-lg border-2 p-3 cursor-pointer transition-colors',
+                form.with_printer
+                  ? 'border-gold bg-gold/5'
+                  : 'border-hairline hover:border-muted'
+              )}>
+                <input
+                  type="radio"
+                  name="printer"
+                  className="sr-only"
+                  checked={form.with_printer}
+                  onChange={() => f('with_printer', true)}
+                />
+                <span className="text-sm font-medium text-ink">Mit Drucker</span>
+                <span className="text-xs text-muted">inkl. 400 Fotos + Mediapaket</span>
+                <span className="text-base font-bold text-gold mt-1">€ 300,–</span>
+              </label>
+              <label className={cn(
+                'flex flex-col gap-1 rounded-lg border-2 p-3 cursor-pointer transition-colors',
+                !form.with_printer
+                  ? 'border-gold bg-gold/5'
+                  : 'border-hairline hover:border-muted'
+              )}>
+                <input
+                  type="radio"
+                  name="printer"
+                  className="sr-only"
+                  checked={!form.with_printer}
+                  onChange={() => f('with_printer', false)}
+                />
+                <span className="text-sm font-medium text-ink">Ohne Drucker</span>
+                <span className="text-xs text-muted">inkl. 400 Fotos + Mediapaket</span>
+                <span className="text-base font-bold text-gold mt-1">€ 200,–</span>
+              </label>
+            </div>
+
+            {/* Aufbaukosten */}
             <Input
-              label="Mediapakete (à 400 Fotos)"
+              label="Aufbaukosten (€ brutto, falls zutreffend)"
               type="number"
-              min="1"
-              value={form.media_packages}
-              onChange={e => f('media_packages', e.target.value)}
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <Input
-              label="Preis Netto (€)"
-              type="number"
-              step="0.01"
+              step="1"
               min="0"
-              value={form.price_net}
-              onChange={e => f('price_net', e.target.value)}
-              placeholder="0,00"
+              value={form.setup_cost}
+              onChange={e => f('setup_cost', e.target.value)}
+              placeholder="0"
             />
-            <Select
-              label="Status"
-              value={form.status}
-              onChange={e => f('status', e.target.value as BookingForm['status'])}
-              options={Object.entries(STATUS_LABELS).map(([value, label]) => ({ value, label }))}
-            />
+
+            {/* Gesamt */}
+            <div className="flex items-center justify-between pt-2 border-t border-hairline">
+              <span className="text-sm text-muted">Gesamt (brutto)</span>
+              <span className="text-lg font-bold text-ink tabular-nums">{formatEuro(calcTotal(form))}</span>
+            </div>
           </div>
+
+          {/* Status */}
+          <Select
+            label="Status"
+            value={form.status}
+            onChange={e => f('status', e.target.value as BookingForm['status'])}
+            options={Object.entries(STATUS_LABELS).map(([value, label]) => ({ value, label }))}
+          />
+
+          {/* Notizen */}
           <Textarea
             label="Notizen"
             value={form.notes}

@@ -17,7 +17,6 @@ export function Layout({
     dashboard:    'Übersicht',
     availability: 'Verfügbarkeit',
     bookings:     'Buchungen',
-    customers:    'Kunden',
   }
 
   return (

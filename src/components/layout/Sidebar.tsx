@@ -1,6 +1,6 @@
 import { cn } from '@/lib/utils'
 
-export type Page = 'dashboard' | 'availability' | 'bookings' | 'customers'
+export type Page = 'dashboard' | 'availability' | 'bookings'
 
 const navItems: { id: Page; label: string; icon: React.ReactNode }[] = [
   {
@@ -33,17 +33,6 @@ const navItems: { id: Page; label: string; icon: React.ReactNode }[] = [
         <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2" strokeLinecap="round" />
         <rect x="9" y="3" width="6" height="4" rx="1" />
         <path d="M9 12h6M9 16h4" strokeLinecap="round" />
-      </svg>
-    ),
-  },
-  {
-    id: 'customers',
-    label: 'Kunden',
-    icon: (
-      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
-        <circle cx="9" cy="7" r="4" />
-        <path d="M3 21v-2a4 4 0 014-4h4a4 4 0 014 4v2" strokeLinecap="round" />
-        <path d="M16 3.13a4 4 0 010 7.75M21 21v-2a4 4 0 00-3-3.87" strokeLinecap="round" />
       </svg>
     ),
   },
