@@ -72,12 +72,14 @@ export type Database = {
           title: string
           billing_company: string | null
           billing_address: string | null
+          billing_email: string | null
           location: string | null
           start_date: string
           end_date: string
           logistics: 'aufbau' | 'abholung'
           with_printer: boolean
           setup_cost: number | null
+          custom_price: number | null
           media_packages: number
           price_net: number | null
           status: 'option' | 'bestaetigt' | 'storniert'
@@ -93,12 +95,14 @@ export type Database = {
           title: string
           billing_company?: string | null
           billing_address?: string | null
+          billing_email?: string | null
           location?: string | null
           start_date: string
           end_date: string
           logistics: 'aufbau' | 'abholung'
           with_printer?: boolean
           setup_cost?: number | null
+          custom_price?: number | null
           media_packages?: number
           price_net?: number | null
           status?: 'option' | 'bestaetigt' | 'storniert'
@@ -112,12 +116,14 @@ export type Database = {
           title?: string
           billing_company?: string | null
           billing_address?: string | null
+          billing_email?: string | null
           location?: string | null
           start_date?: string
           end_date?: string
           logistics?: 'aufbau' | 'abholung'
           with_printer?: boolean
           setup_cost?: number | null
+          custom_price?: number | null
           media_packages?: number
           price_net?: number | null
           status?: 'option' | 'bestaetigt' | 'storniert'

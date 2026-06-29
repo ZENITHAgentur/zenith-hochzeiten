@@ -12,10 +12,6 @@ const MOCO_HEADERS = {
   'Content-Type': 'application/json',
 }
 
-// Pricing constants – adjust as needed
-const SETUP_FEE = 250          // Auf-/Abbau-Pauschale (nur bei logistics='aufbau')
-const MEDIA_PACKAGE_PRICE = 99 // Pro Mediapaket à 400 Fotos
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
 
@@ -23,129 +19,114 @@ serve(async (req) => {
     const { booking_id } = await req.json()
     if (!booking_id) throw new Error('booking_id fehlt')
 
-    // Service-role client – darf invoice-Felder schreiben
+    const mocoDomain = Deno.env.get('MOCO_DOMAIN')
+    const mocoKey = Deno.env.get('MOCO_API_KEY')
+    if (!mocoDomain || !mocoKey) throw new Error('MOCO_DOMAIN oder MOCO_API_KEY nicht konfiguriert')
+
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     )
 
-    // 1. Buchung + Kunde + Box laden
+    // Buchung laden (ohne customers-Join)
     const { data: booking, error: bErr } = await supabase
       .from('bookings')
-      .select('*, customers(*), boxes(*)')
+      .select('*, boxes(*)')
       .eq('id', booking_id)
       .single()
     if (bErr || !booking) throw new Error('Buchung nicht gefunden')
     if (booking.invoice_status !== 'keine') throw new Error('Rechnungsentwurf bereits vorhanden')
 
-    const customer = booking.customers
     const box = booking.boxes
+    const companyName = booking.billing_company ?? 'Unbekannt'
 
-    // 2. MOCO-Kunde finden oder anlegen
-    let mocoCompanyId: number = customer?.moco_company_id ?? 0
+    // MOCO-Firma suchen oder anlegen
+    let mocoCompanyId = 0
 
-    if (!mocoCompanyId && customer) {
-      // Suche nach Firmenname
-      const searchRes = await fetch(
-        `${MOCO_BASE}/companies?term=${encodeURIComponent(customer.company)}&type=customer`,
-        { headers: MOCO_HEADERS },
-      )
-      const companies = await searchRes.json()
+    const searchRes = await fetch(
+      `${MOCO_BASE}/companies?term=${encodeURIComponent(companyName)}&type=customer`,
+      { headers: MOCO_HEADERS },
+    )
+    if (!searchRes.ok) throw new Error(`MOCO-Suche fehlgeschlagen: ${await searchRes.text()}`)
+    const companies = await searchRes.json()
 
-      if (Array.isArray(companies) && companies.length > 0) {
-        mocoCompanyId = companies[0].id
-      } else {
-        // Neu anlegen
-        const createRes = await fetch(`${MOCO_BASE}/companies`, {
-          method: 'POST',
-          headers: MOCO_HEADERS,
-          body: JSON.stringify({
-            name: customer.company,
-            type: 'customer',
-            country_code: 'DE',
-            vat_identifier: customer.vat_id ?? undefined,
-            phone: customer.phone ?? undefined,
-            email: customer.email ?? undefined,
-          }),
-        })
-        if (!createRes.ok) {
-          const t = await createRes.text()
-          throw new Error(`MOCO Firma anlegen fehlgeschlagen: ${t}`)
-        }
-        const created = await createRes.json()
-        mocoCompanyId = created.id
-
-        // moco_company_id zurückschreiben
-        await supabase
-          .from('customers')
-          .update({ moco_company_id: mocoCompanyId })
-          .eq('id', customer.id)
-      }
+    if (Array.isArray(companies) && companies.length > 0) {
+      mocoCompanyId = companies[0].id
+    } else {
+      const createRes = await fetch(`${MOCO_BASE}/companies`, {
+        method: 'POST',
+        headers: MOCO_HEADERS,
+        body: JSON.stringify({
+          name: companyName,
+          type: 'customer',
+          country_code: 'DE',
+          email: booking.billing_email ?? undefined,
+        }),
+      })
+      if (!createRes.ok) throw new Error(`MOCO Firma anlegen fehlgeschlagen: ${await createRes.text()}`)
+      const created = await createRes.json()
+      mocoCompanyId = created.id
     }
 
-    // 3. Rechnungsposten zusammenstellen
-    const items: object[] = []
+    // Rechnungsanschrift aus Inline-Feldern
+    const recipientAddress = [
+      companyName,
+      booking.billing_address,
+    ].filter(Boolean).join('\n')
 
-    // Hauptposition: vereinbarter Netto-Mietpreis
-    if (booking.price_net) {
-      items.push({
+    // Rechnungsposten
+    const items: object[] = [
+      {
         type: 'item',
-        title: `Fotobox-Miete – ${box?.name ?? 'Fotobox'}`,
+        title: booking.with_printer
+          ? `Fotobox-Miete mit Drucker – ${box?.name ?? 'Fotobox'} · inkl. 400 Fotos + Mediapaket`
+          : `Fotobox-Miete ohne Drucker – ${box?.name ?? 'Fotobox'} · inkl. 400 Fotos + Mediapaket`,
         quantity: 1,
         unit: 'Pauschale',
-        unit_price: booking.price_net,
-      })
-    }
+        unit_price: booking.with_printer ? 300 : 200,
+      },
+    ]
 
-    // Auf-/Abbau nur wenn logistics='aufbau'
-    if (booking.logistics === 'aufbau') {
+    if (booking.setup_cost && booking.setup_cost > 0) {
       items.push({
         type: 'item',
         title: 'Auf-/Abbau & Anfahrt',
         quantity: 1,
         unit: 'pauschal',
-        unit_price: SETUP_FEE,
+        unit_price: booking.setup_cost,
       })
     }
 
-    // Mediapakete
-    if (booking.media_packages > 0) {
-      items.push({
-        type: 'item',
-        title: 'Mediapaket à 400 Fotos',
-        quantity: booking.media_packages,
-        unit: 'Paket',
-        unit_price: MEDIA_PACKAGE_PRICE,
-      })
+    // Bei Sonderpreis: Rabatt-Position
+    if (booking.custom_price != null) {
+      const regularTotal = (booking.with_printer ? 300 : 200) + (booking.setup_cost ?? 0)
+      const discount = booking.custom_price - regularTotal
+      if (discount !== 0) {
+        items.push({
+          type: 'item',
+          title: discount < 0 ? 'Rabatt / Sonderpreis' : 'Aufpreis',
+          quantity: 1,
+          unit: 'pauschal',
+          unit_price: discount,
+        })
+      }
     }
 
-    // Rechnungsanschrift zusammensetzen
-    const addrParts = [
-      customer?.company,
-      customer?.contact ? `z. Hd. ${customer.contact}` : undefined,
-      customer?.street,
-      [customer?.zip, customer?.city].filter(Boolean).join(' '),
-    ].filter(Boolean)
-    const recipientAddress = addrParts.join('\n')
-
-    // Fälligkeitsdatum: +14 Tage
     const today = new Date().toISOString().slice(0, 10)
     const dueDate = new Date()
     dueDate.setDate(dueDate.getDate() + 14)
-    const dueDateStr = dueDate.toISOString().slice(0, 10)
 
-    // 4. Rechnungsentwurf in MOCO anlegen
     const invoicePayload = {
       customer_id: mocoCompanyId,
       recipient_address: recipientAddress,
       date: today,
-      due_date: dueDateStr,
-      service_period_from: booking.start_date,
+      due_date: dueDate.toISOString().slice(0, 10),
+      service_period_from: booking.end_date,
       service_period_to: booking.end_date,
       title: `Fotobox-Vermietung – ${booking.title}`,
       currency: 'EUR',
       tax: 19.0,
-      status: 'created', // = Entwurf, wird NICHT automatisch versendet
+      status: 'created',
       items,
     }
 
@@ -154,13 +135,9 @@ serve(async (req) => {
       headers: MOCO_HEADERS,
       body: JSON.stringify(invoicePayload),
     })
-    if (!invoiceRes.ok) {
-      const t = await invoiceRes.text()
-      throw new Error(`MOCO Rechnung anlegen fehlgeschlagen: ${t}`)
-    }
+    if (!invoiceRes.ok) throw new Error(`MOCO Rechnung anlegen fehlgeschlagen: ${await invoiceRes.text()}`)
     const invoice = await invoiceRes.json()
 
-    // 5. invoice_id + Status zurückschreiben (nur via Service-Role erlaubt)
     await supabase
       .from('bookings')
       .update({ moco_invoice_id: invoice.id, invoice_status: 'entwurf' })

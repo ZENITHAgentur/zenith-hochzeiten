@@ -20,15 +20,13 @@ serve(async (req) => {
 
     const { data: booking, error: bErr } = await supabase
       .from('bookings')
-      .select('*, customers(*), boxes(*)')
+      .select('*, boxes(*)')
       .eq('id', booking_id)
       .single()
     if (bErr || !booking) throw new Error('Buchung nicht gefunden')
 
-    const customer = booking.customers
     const box = booking.boxes
 
-    // Format date DE
     const fmtDate = (d: string | null) => {
       if (!d) return '—'
       const [y, m, day] = d.split('-')
@@ -37,9 +35,10 @@ serve(async (req) => {
     const fmtEuro = (v: number | null) =>
       v != null ? new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(v) : '—'
 
-    const dateRange = booking.start_date === booking.end_date
-      ? fmtDate(booking.start_date)
-      : `${fmtDate(booking.start_date)} – ${fmtDate(booking.end_date)}`
+    const hasAufbau = booking.start_date !== booking.end_date
+    const paket = booking.with_printer
+      ? 'Mit Drucker · inkl. 400 Fotos + Mediapaket (€ 300,–)'
+      : 'Ohne Drucker · inkl. 400 Fotos + Mediapaket (€ 200,–)'
 
     const mocoLink = booking.moco_invoice_id
       ? `\nhttps://${Deno.env.get('MOCO_DOMAIN')}.mocoapp.com/invoices/${booking.moco_invoice_id}`
@@ -48,34 +47,24 @@ serve(async (req) => {
     const body = `Buchungsübergabe an Buchhaltung
 ================================
 
-Anlass:       ${booking.title}
-Box:          ${box?.name ?? '—'}
-Zeitraum:     ${dateRange}
-Ort:          ${booking.location ?? '—'}
-Logistik:     ${booking.logistics === 'aufbau' ? 'Auf-/Abbau (wir)' : 'Abholung (Kunde)'}
-Mediapakete:  ${booking.media_packages}× (à 400 Fotos)
-Preis Netto:  ${fmtEuro(booking.price_net)}
-Status:       ${booking.status}
+Anlass:           ${booking.title}
+Box:              ${box?.name ?? '—'}
+${hasAufbau ? `Aufbaudatum:      ${fmtDate(booking.start_date)}\n` : ''}Veranstaltungstag: ${fmtDate(booking.end_date)}
+Ort:              ${booking.location ?? '—'}
+Paket:            ${paket}${booking.setup_cost ? `\nAufbaukosten:     ${fmtEuro(booking.setup_cost)}` : ''}${booking.custom_price != null ? `\nSonderpreis:      ${fmtEuro(booking.custom_price)}` : ''}
+Gesamt (brutto):  ${fmtEuro(booking.price_net)}
+Status:           ${booking.status}
 
 Rechnungsanschrift:
-${[
-  customer?.company,
-  customer?.contact ? `z. Hd. ${customer.contact}` : null,
-  customer?.street,
-  [customer?.zip, customer?.city].filter(Boolean).join(' '),
-  customer?.vat_id ? `USt-IdNr.: ${customer.vat_id}` : null,
-].filter(Boolean).join('\n')}
-
+${[booking.billing_company, booking.billing_address].filter(Boolean).join('\n') || '— keine Angabe —'}
+${booking.billing_email ? `\nRechnungs-E-Mail: ${booking.billing_email}` : ''}
 Rechnungsstatus: ${booking.invoice_status}${mocoLink}
-
-${booking.notes ? `Notizen:\n${booking.notes}` : ''}
-`.trim()
+${booking.notes ? `\nNotizen:\n${booking.notes}` : ''}`.trim()
 
     const accountingEmail = Deno.env.get('ACCOUNTING_EMAIL') ?? 'buchhaltung@zenith-agentur.de'
     const resendKey = Deno.env.get('RESEND_API_KEY')
 
     if (resendKey) {
-      // Versand über Resend
       const mailRes = await fetch('https://api.resend.com/emails', {
         method: 'POST',
         headers: {
@@ -85,17 +74,13 @@ ${booking.notes ? `Notizen:\n${booking.notes}` : ''}
         body: JSON.stringify({
           from: 'Fotobox-Dashboard <noreply@zenith-agentur.de>',
           to: accountingEmail,
-          subject: `Buchungsübergabe: ${booking.title} (${dateRange})`,
+          subject: `Buchungsübergabe: ${booking.title} (${fmtDate(booking.end_date)})`,
           text: body,
         }),
       })
-      if (!mailRes.ok) {
-        const t = await mailRes.text()
-        throw new Error(`Resend-Fehler: ${t}`)
-      }
+      if (!mailRes.ok) throw new Error(`Resend-Fehler: ${await mailRes.text()}`)
     }
 
-    // Immer Erfolg zurückgeben (auch ohne Resend – dann nur interne Notiz)
     return new Response(
       JSON.stringify({ success: true, preview: body }),
       { headers: { ...CORS, 'Content-Type': 'application/json' } },
